@@ -1,6 +1,6 @@
 # open-next-stack
 
-### 1. Copy the example as .env. and change your configuration
+### 1. Copy the example as [.env](./.env) and change your configuration
 
 ```bash
 cp env.example .env
@@ -11,6 +11,10 @@ cp env.example .env
 ```bash
 yarn bootstrap ${YOUR_PROFILE_NAME}
 ```
+
+### 2.1 Add your project information in [item_config.ts](./item_config.ts)
+
+### 2.2 Add your domain information and host zone information in [ACM_config.ts](./ACM_config.ts)
 
 ### 3. deploy
 
