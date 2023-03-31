@@ -45,6 +45,8 @@ export class CreateNextFoundationStack extends cdk.NestedStack {
 
         // create cloudfront
         const cf = this.createCloudFrontDistribution(name, bucket, serverFunc.url, imageFunc.url);
+
+        return cf;
     }
 
     /**

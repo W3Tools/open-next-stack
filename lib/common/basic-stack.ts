@@ -2,13 +2,16 @@ import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import { Duration } from 'aws-cdk-lib';
 import { aws_lambda as lambda, aws_s3 as S3, aws_cloudfront as cloudfront } from 'aws-cdk-lib';
+import { StackConfig } from '../configs/basic.config';
 
 export class BasicStack {
     private scope: Construct;
     public policies: CachePolicies;
+    private region: string;
 
     constructor(scope: Construct, region?: string) {
         this.scope = scope;
+        this.region = region ? region : StackConfig.region;
         this.policies = this.createCachePolicy();
     }
 
