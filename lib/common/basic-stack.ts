@@ -1,8 +1,8 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import { Duration } from 'aws-cdk-lib';
-import { aws_lambda as lambda, aws_s3 as S3, aws_cloudfront as cloudfront } from 'aws-cdk-lib';
 import { StackConfig } from '../configs/basic.config';
+import { aws_lambda as lambda, aws_s3 as S3, aws_cloudfront as cloudfront, aws_route53 as route53, aws_certificatemanager as acm } from 'aws-cdk-lib';
 
 export class BasicStack {
     private scope: Construct;
@@ -111,10 +111,30 @@ export class BasicStack {
                 allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
                 cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
             },
+            certificate: struct.cert,
+            domainNames: struct.alias,
         };
 
         const cf = new cloudfront.Distribution(this.scope, `${struct.name}-cloudfront`, props);
         return cf;
+    }
+
+    /**
+     * Create cname record, like app-v1.w3tools.app ---CNAME---> app.w3tools.app
+     * @param zone
+     * @param src Such as app-v1.w3tools.app
+     * @param dist Such as app.w3tools.app
+     * @param ttl Default 60s
+     * @returns
+     */
+    createRoute53Cname(zone: route53.IHostedZone, src: string, dist: string, ttl?: number): route53.CnameRecord {
+        const record = new route53.CnameRecord(this.scope, `${src}-route53`, {
+            zone: zone,
+            recordName: src,
+            domainName: dist,
+            ttl: Duration.seconds(ttl ? ttl : 60),
+        });
+        return record;
     }
 }
 
@@ -143,4 +163,6 @@ export interface ILambdaFunctionStruct {
 export interface ICloudFrontStruct {
     name: string;
     origin: cloudfront.IOrigin;
+    alias?: string[];
+    cert?: acm.ICertificate;
 }

@@ -1,29 +1,48 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-import { aws_iam as iam, aws_lambda as lambda, aws_cloudfront as cloudfront, aws_cloudfront_origins as origins, aws_s3 as S3 } from 'aws-cdk-lib';
+import { IConfig } from '../common/config-parse';
 import { BasicStack } from '../common/basic-stack';
+import { aws_iam as iam, aws_lambda as lambda, aws_cloudfront as cloudfront, aws_cloudfront_origins as origins, aws_s3 as S3, aws_certificatemanager as acm } from 'aws-cdk-lib';
 
 export interface CreateNextFoundationStackProps extends cdk.NestedStackProps {
     rootId: string;
+    projects: IConfig[];
+}
+
+export interface NextFoundationResultProps {
+    region: string;
+    domain: string;
+    bucket: string;
+    cloudfrontId: string;
+    defaultDomain: string;
+    customDomain: string[];
+    serverFunction: FunctionResultProps;
+    imageOptimizationFunction: FunctionResultProps;
+}
+
+export interface FunctionResultProps {
+    name: string;
+    url?: string;
 }
 
 export class CreateNextFoundationStack extends cdk.NestedStack {
     private modules: BasicStack;
     private scope: Construct;
+    public result: NextFoundationResultProps[] = [];
+    private props: CreateNextFoundationStackProps;
 
     constructor(scope: Construct, id: string, props: CreateNextFoundationStackProps) {
         super(scope, id, props);
         this.scope = scope;
+        this.props = props;
         this.modules = new BasicStack(this, this.region);
         this.main();
     }
 
     main() {
-        const bucketName = 'open-next-test.w3tools.app';
-        this.buildFoundation(bucketName);
-
-        const bucketName1 = 'swap.w3tools.app';
-        this.buildFoundation(bucketName1);
+        for (const item of this.props.projects) {
+            this.buildFoundation(item);
+        }
     }
 
     /**
@@ -31,22 +50,39 @@ export class CreateNextFoundationStack extends cdk.NestedStack {
      * Include: S3, server-lambda-function, image-optimization-lambda-function, cloudfront
      * @param name Project name
      */
-    buildFoundation(name: string) {
+    buildFoundation(cfg: IConfig) {
         // create aws s3 bucket
         const bucket = this.modules.createBucket({
-            bucketName: name,
+            bucketName: cfg.name,
         });
 
         // create server function
-        const serverFunc = this.createServerFunction(name);
+        const serverFunc = this.createServerFunction(cfg.name);
 
         // create image optimization function
-        const imageFunc = this.createImageOptimizationFunction(name, bucket);
+        const imageFunc = this.createImageOptimizationFunction(cfg.name, bucket);
 
         // create cloudfront
-        const cf = this.createCloudFrontDistribution(name, bucket, serverFunc.url, imageFunc.url);
+        const alias = cfg.certArn ? (cfg.alias ? [cfg.name, ...cfg.alias] : [cfg.name]) : [];
+        const cf = this.createCloudFrontDistribution(cfg.name, bucket, serverFunc.url, imageFunc.url, cfg.certArn, alias);
 
-        return cf;
+        // create cname
+        if (cfg.hostZone) {
+            for (const name of alias) {
+                this.modules.createRoute53Cname(cfg.hostZone, name, cf.distributionDomainName);
+            }
+        }
+
+        this.result.push({
+            region: this.region,
+            domain: cfg.name,
+            bucket: bucket.bucketName,
+            cloudfrontId: cf.distributionId,
+            defaultDomain: cf.distributionDomainName,
+            customDomain: alias,
+            serverFunction: { name: serverFunc.func.functionName, url: serverFunc.url },
+            imageOptimizationFunction: { name: imageFunc.func.functionName, url: imageFunc.url },
+        });
     }
 
     /**
@@ -96,7 +132,7 @@ export class CreateNextFoundationStack extends cdk.NestedStack {
      * @param imageFuncUrl
      * @returns
      */
-    createCloudFrontDistribution(name: string, bucket: S3.Bucket, serverFunUrl: string, imageFuncUrl: string): cloudfront.Distribution {
+    createCloudFrontDistribution(name: string, bucket: S3.Bucket, serverFunUrl: string, imageFuncUrl: string, cert?: acm.ICertificate, alias?: string[]): cloudfront.Distribution {
         const s3Origin = new origins.S3Origin(bucket);
         const serverFunctionOrigin = new origins.HttpOrigin(cdk.Fn.parseDomainName(serverFunUrl)); // see https://github.com/aws/aws-cdk/issues/20254
         const imageFunctionOrigin = new origins.HttpOrigin(cdk.Fn.parseDomainName(imageFuncUrl));
@@ -106,7 +142,7 @@ export class CreateNextFoundationStack extends cdk.NestedStack {
             fallbackStatusCodes: [400, 403, 404],
         });
 
-        const cf = this.modules.createCloudFront({ name: name, origin: originGroup });
+        const cf = this.modules.createCloudFront({ name: name, origin: originGroup, alias: alias, cert: cert });
         cf.addBehavior('/api/*', serverFunctionOrigin, this.getApiBehaviorOptions(this.modules.policies.api.cachePolicyId));
         cf.addBehavior('/_next/data/*', serverFunctionOrigin, this.getNextDataBehaviorOptions(this.modules.policies.nextData.cachePolicyId));
         cf.addBehavior('/_next/static/*', s3Origin, this.getNextStaticBehaviorOptions());
