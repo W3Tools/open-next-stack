@@ -142,7 +142,18 @@ export class CreateNextFoundationStack extends cdk.NestedStack {
             fallbackStatusCodes: [400, 403, 404],
         });
 
-        const cf = this.modules.createCloudFront({ name: name, origin: originGroup, alias: alias, cert: cert });
+        let domain: string[] = [];
+        if (alias) {
+            for (let item of alias) {
+                if (item.startsWith('www.')) {
+                    const aliasArr = item.split('.');
+                    domain.push(`${aliasArr[1]}.${aliasArr[2]}`);
+                }
+                domain.push(item);
+            }
+        }
+
+        const cf = this.modules.createCloudFront({ name: name, origin: originGroup, alias: domain, cert: cert });
         cf.addBehavior('/api/*', serverFunctionOrigin, this.getApiBehaviorOptions(this.modules.policies.api.cachePolicyId));
         cf.addBehavior('/_next/data/*', serverFunctionOrigin, this.getNextDataBehaviorOptions(this.modules.policies.nextData.cachePolicyId));
         cf.addBehavior('/_next/static/*', s3Origin, this.getNextStaticBehaviorOptions());
