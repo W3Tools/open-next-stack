@@ -21,3 +21,14 @@ yarn bootstrap ${YOUR_PROFILE_NAME}
 ```bash
 yarn deploy ${YOUR_PROFILE_NAME}
 ```
+
+### How to Start?
+
+-   ### install depend
+    ```
+    yarn install
+    ```
+-   ### Enable yarn3 in vscode
+    ```
+    yarn dlx @yarnpkg/sdks vscode
+    ```

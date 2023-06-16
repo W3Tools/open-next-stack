@@ -115,7 +115,7 @@ export class CreateNextFoundationStack extends cdk.NestedStack {
         func.addToRolePolicy(
             new iam.PolicyStatement({
                 effect: iam.Effect.ALLOW,
-                actions: ['s3:GetObject'],
+                actions: ['s3:GetObject', 's3:PutObject'],
                 resources: [`${bucket.bucketArn}/*`],
             })
         );
