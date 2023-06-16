@@ -142,9 +142,9 @@ export class CreateNextFoundationStack extends cdk.NestedStack {
             fallbackStatusCodes: [400, 403, 404],
         });
 
-        let domain: string[] = [];
+        const domain: string[] = [];
         if (alias) {
-            for (let item of alias) {
+            for (const item of alias) {
                 if (item.startsWith('www.')) {
                     const aliasArr = item.split('.');
                     domain.push(`${aliasArr[1]}.${aliasArr[2]}`);
